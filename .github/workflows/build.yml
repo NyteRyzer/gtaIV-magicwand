@@ -1,0 +1,45 @@
+name: Build MagicWand.asi
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Zolika1351/iv-sdk, pinned so builds are reproducible
+  IVSDK_COMMIT: dddbd3f54b146bdb3a9852809e48e5cb169af3cd
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch IV-SDK
+        shell: bash
+        run: |
+          git init -q iv-sdk
+          git -C iv-sdk remote add origin https://github.com/Zolika1351/iv-sdk.git
+          git -C iv-sdk fetch -q --depth 1 origin "$IVSDK_COMMIT"
+          git -C iv-sdk checkout -q FETCH_HEAD
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86 # GTA IV is a 32-bit game
+
+      - name: Compile
+        shell: cmd
+        run: |
+          mkdir build
+          cl /nologo /std:c++17 /O2 /MT /EHsc /LD /DNDEBUG /I src\shim /I iv-sdk\include /Fobuild\ src\MagicWand.cpp /link /OUT:build\MagicWand.asi user32.lib version.lib
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/MagicWand.asi MagicWand.ini README.md dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MagicWand
+          path: dist/
